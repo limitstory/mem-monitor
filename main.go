@@ -48,6 +48,9 @@ func GetPodInfo(client internalapi.RuntimeService) bool {
 		}
 		// Do not store info of notworking pods
 		status, _ := client.PodSandboxStatus(context.TODO(), stats[i].Attributes.Id, false)
+		if status == nil { // exception handling: nil pointer
+			continue
+		}
 		if status.Status.State == 1 { // exception handling: SANDBOX_NOTREADY
 			continue
 		}
