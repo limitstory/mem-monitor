@@ -38,7 +38,6 @@ func GetPodInfo(client internalapi.RuntimeService) bool {
 
 	stats, err := client.ListPodSandboxStats(context.TODO(), filter)
 	if err != nil {
-		fmt.Println(err)
 		return true
 	}
 
@@ -48,10 +47,7 @@ func GetPodInfo(client internalapi.RuntimeService) bool {
 			continue
 		}
 		// Do not store info of notworking pods
-		status, err := client.PodSandboxStatus(context.TODO(), stats[i].Attributes.Id, false)
-		if err != nil {
-			fmt.Println(err)
-		}
+		status, _ := client.PodSandboxStatus(context.TODO(), stats[i].Attributes.Id, false)
 		if status.Status.State == 1 { // exception handling: SANDBOX_NOTREADY
 			continue
 		}
