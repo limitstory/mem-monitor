@@ -4,14 +4,25 @@ import (
 	"context"
 	"fmt"
 	mod "mem_monitor/modules"
+	"os"
 	"time"
 
 	"github.com/shirou/gopsutil/mem"
-	"k8s.io/kubernetes/pkg/kubelet/cri/remote"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	internalapi "k8s.io/cri-api/pkg/apis"
 	pb "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
+
+func IsSucceed(podsItems []v1.Pod) bool {
+	for _, pod := range podsItems {
+		if pod.Status.Phase != "Succeeded" {
+			return false
+		}
+	}
+	return true
+}
 
 func GetSystemMemoryStatsInfo() mod.Memory {
 	var get_memory mod.Memory
@@ -65,6 +76,8 @@ func GetPodInfo(client internalapi.RuntimeService) bool {
 }
 
 func main() {
+	var pods *v1.PodList
+	var err error
 	var minMemoryUsagePercent float64 = 100.0
 	var maxMemoryUsagePercent float64 = 0
 	var totalMemoryUsagePercent float64 = 0
@@ -72,16 +85,27 @@ func main() {
 
 	var getMemoryArray []float64
 
-	const ENDPOINT string = "unix:///var/run/crio/crio.sock"
-	client, err := remote.NewRemoteRuntimeService(ENDPOINT, time.Second*2, nil)
-	if err != nil {
-		panic(err)
+	/*
+		const ENDPOINT string = "unix:///var/run/crio/crio.sock"
+		client, err := remote.NewRemoteRuntimeService(ENDPOINT, time.Second, nil)
+		if err != nil {
+			panic(err)
+		}*/
+
+	// kubernetes api 클라이언트 생성하는 모듈
+	clientset := mod.InitClient()
+	if clientset == nil {
+		fmt.Println("Could not create client!")
+		os.Exit(-1)
 	}
 
 	for {
-		if GetPodInfo(client) == false {
-			break
-		} else {
+		pods, err = clientset.CoreV1().Pods("default").List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			panic(err)
+		}
+
+		if IsSucceed(pods.Items) == false {
 			get_memory := GetSystemMemoryStatsInfo()
 			iteration++
 
@@ -94,8 +118,9 @@ func main() {
 			totalMemoryUsagePercent += get_memory.UsedPercent
 
 			getMemoryArray = append(getMemoryArray, get_memory.UsedPercent)
-
 			time.Sleep(time.Second)
+		} else {
+			break
 		}
 	}
 
